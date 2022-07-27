@@ -1483,6 +1483,40 @@ PHP_FUNCTION(memory_reset_peak_usage) {
 }
 /* }}} */
 
+/* {{{ Returns the allocated by PHP memory */
+PHP_FUNCTION(convert_bytes) {
+	zend_long bytes;
+	zend_long unit;
+	double result = 0.00;
+	const unsigned short BYTE_SIZE = 1000;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_LONG(bytes)
+		Z_PARAM_LONG(unit)
+	ZEND_PARSE_PARAMETERS_END();
+
+	if (bytes < 0) {
+		zend_argument_value_error(1, "must be greater or equal to 0 (zero)");
+		RETURN_THROWS();	
+	}
+
+	if (unit < 1) {
+		zend_argument_value_error(2, "must be greater or equal to 1"); // TODO: rely in constants
+		RETURN_THROWS();	
+	}
+
+	result = bytes;
+	
+	//TODO: replace unit with constants
+	while (unit > 1) {
+		result /= BYTE_SIZE;
+		--unit;
+	}
+
+	RETURN_DOUBLE(result);
+}
+/* }}} */
+
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("unserialize_max_depth", "4096", PHP_INI_ALL, OnUpdateLong, unserialize_max_depth, php_basic_globals, basic_globals)
 PHP_INI_END()

@@ -1727,6 +1727,12 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_number_format, 0, 1, IS_STRING, 
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, decimals, IS_LONG, 0, "0")
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, decimal_separator, IS_STRING, 1, "\".\"")
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, thousands_separator, IS_STRING, 1, "\",\"")
+	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, , IS_LONG, 0, "0")
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_convert_bytes, 0, 1, IS_DOUBLE, 0)
+	ZEND_ARG_TYPE_INFO(0, bytes, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, unit, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_fmod, 0, 2, IS_DOUBLE, 0)
@@ -2679,6 +2685,7 @@ ZEND_FUNCTION(decoct);
 ZEND_FUNCTION(dechex);
 ZEND_FUNCTION(base_convert);
 ZEND_FUNCTION(number_format);
+ZEND_FUNCTION(convert_bytes);
 ZEND_FUNCTION(fmod);
 ZEND_FUNCTION(fdiv);
 #if defined(HAVE_GETTIMEOFDAY)
@@ -3317,6 +3324,7 @@ static const zend_function_entry ext_functions[] = {
 	ZEND_SUPPORTS_COMPILE_TIME_EVAL_FE(dechex, arginfo_dechex)
 	ZEND_FE(base_convert, arginfo_base_convert)
 	ZEND_FE(number_format, arginfo_number_format)
+	ZEND_FE(convert_bytes, arginfo_convert_bytes)
 	ZEND_FE(fmod, arginfo_fmod)
 	ZEND_FE(fdiv, arginfo_fdiv)
 #if defined(HAVE_GETTIMEOFDAY)

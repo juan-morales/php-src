@@ -1573,6 +1573,8 @@ function base_convert(string $num, int $from_base, int $to_base): string {}
 /** @refcount 1 */
 function number_format(float $num, int $decimals = 0, ?string $decimal_separator = ".", ?string $thousands_separator = ","): string {}
 
+function convert_bytes(int $bytes, int $unit): float {}
+
 function fmod(float $num1, float $num2): float {}
 
 function fdiv(float $num1, float $num2): float {}
