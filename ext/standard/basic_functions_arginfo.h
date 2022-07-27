@@ -1,5 +1,5 @@
 /* This is a generated file, edit the .stub.php file instead.
- * Stub hash: 2615114ae250af0329b861d82f4100c2757457da */
+ * Stub hash: 96366ba95cdfdc84e20abdfb3d917ae1234f1395 */
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_set_time_limit, 0, 1, _IS_BOOL, 0)
 	ZEND_ARG_TYPE_INFO(0, seconds, IS_LONG, 0)
@@ -1727,10 +1727,9 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_number_format, 0, 1, IS_STRING, 
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, decimals, IS_LONG, 0, "0")
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, decimal_separator, IS_STRING, 1, "\".\"")
 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, thousands_separator, IS_STRING, 1, "\",\"")
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, , IS_LONG, 0, "0")
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_convert_bytes, 0, 1, IS_DOUBLE, 0)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_convert_bytes, 0, 2, IS_DOUBLE, 0)
 	ZEND_ARG_TYPE_INFO(0, bytes, IS_LONG, 0)
 	ZEND_ARG_TYPE_INFO(0, unit, IS_LONG, 0)
 ZEND_END_ARG_INFO()

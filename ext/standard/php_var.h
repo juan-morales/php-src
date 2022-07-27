@@ -66,4 +66,14 @@ PHPAPI void var_push_dtor(php_unserialize_data_t *var_hash, zval *val);
 PHPAPI zval *var_tmp_var(php_unserialize_data_t *var_hashx);
 PHPAPI void var_destroy(php_unserialize_data_t *var_hash);
 
+#define MEMORY_UNIT_BYTE 1
+#define MEMORY_UNIT_KILOBYTE 2
+#define MEMORY_UNIT_MEGABYTE 3
+#define MEMORY_UNIT_GIGABYTE 4
+
+#define MEMORY_UNIT_BYTE_SYMBOL "B"
+#define MEMORY_UNIT_KILOBYTE_SYMBOL "KB"
+#define MEMORY_UNIT_MEGABYTE_SYMBOL "MB"
+#define MEMORY_UNIT_GIGABYTE_SYMBOL "GB"
+
 #endif /* PHP_VAR_H */
