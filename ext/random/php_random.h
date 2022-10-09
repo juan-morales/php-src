@@ -107,7 +107,7 @@ static inline uint64_t php_random_uint128_lo(php_random_uint128_t num)
 static inline php_random_uint128_t php_random_uint128_constant(uint64_t hi, uint64_t lo)
 {
 	php_random_uint128_t r;
-	
+
 	r.hi = hi;
 	r.lo = lo;
 
@@ -117,7 +117,7 @@ static inline php_random_uint128_t php_random_uint128_constant(uint64_t hi, uint
 static inline php_random_uint128_t php_random_uint128_add(php_random_uint128_t num1, php_random_uint128_t num2)
 {
 	php_random_uint128_t r;
-	
+
 	r.lo = (num1.lo + num2.lo);
 	r.hi = (num1.hi + num2.hi + (r.lo < num1.lo));
 
@@ -133,7 +133,7 @@ static inline php_random_uint128_t php_random_uint128_multiply(php_random_uint12
 		y0 = num2.lo & 0xffffffffULL,
 		y1 = num2.lo >> 32,
 		z0 = (((x1 * y0) + (x0 * y0 >> 32)) & 0xffffffffULL) + x0 * y1;
-	
+
 	r.hi = num1.hi * num2.lo + num1.lo * num2.hi;
 	r.lo = num1.lo * num2.lo;
 	r.hi += x1 * y1 + ((x1 * y0 + (x0 * y0 >> 32)) >> 32) + (z0 >> 32);
@@ -318,6 +318,8 @@ ZEND_BEGIN_MODULE_GLOBALS(random)
 	bool mt19937_seeded;
 	int random_fd;
 ZEND_END_MODULE_GLOBALS(random)
+
+PHPAPI ZEND_EXTERN_MODULE_GLOBALS(random)
 
 # define RANDOM_G(v)	ZEND_MODULE_GLOBALS_ACCESSOR(random, v)
 

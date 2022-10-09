@@ -203,6 +203,11 @@ static bool unserialize(php_random_status *status, HashTable *data)
 	php_random_status_state_mt19937 *s = status->state;
 	zval *t;
 
+	/* Verify the expected number of elements, this implicitly ensures that no additional elements are present. */
+	if (zend_hash_num_elements(data) != (MT_N + 2)) {
+		return false;
+	}
+
 	for (uint32_t i = 0; i < MT_N; i++) {
 		t = zend_hash_index_find(data, i);
 		if (!t || Z_TYPE_P(t) != IS_STRING || Z_STRLEN_P(t) != (2 * sizeof(uint32_t))) {
@@ -358,6 +363,12 @@ PHP_METHOD(Random_Engine_Mt19937, __unserialize)
 		Z_PARAM_ARRAY_HT(d);
 	ZEND_PARSE_PARAMETERS_END();
 
+	/* Verify the expected number of elements, this implicitly ensures that no additional elements are present. */
+	if (zend_hash_num_elements(d) != 2) {
+		zend_throw_exception_ex(NULL, 0, "Invalid serialization data for %s object", ZSTR_VAL(engine->std.ce->name));
+		RETURN_THROWS();
+	}
+
 	/* members */
 	t = zend_hash_index_find(d, 0);
 	if (!t || Z_TYPE_P(t) != IS_ARRAY) {
@@ -365,6 +376,10 @@ PHP_METHOD(Random_Engine_Mt19937, __unserialize)
 		RETURN_THROWS();
 	}
 	object_properties_load(&engine->std, Z_ARRVAL_P(t));
+	if (EG(exception)) {
+		zend_throw_exception_ex(NULL, 0, "Invalid serialization data for %s object", ZSTR_VAL(engine->std.ce->name));
+		RETURN_THROWS();
+	}
 
 	/* state */
 	t = zend_hash_index_find(d, 1);

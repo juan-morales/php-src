@@ -90,7 +90,7 @@ PHP_METHOD(Random_Randomizer, __construct)
 
 /* {{{ Generate positive random number */
 PHP_METHOD(Random_Randomizer, nextInt)
-{	
+{
 	php_random_randomizer *randomizer = Z_RANDOM_RANDOMIZER_P(ZEND_THIS);
 	uint64_t result;
 
@@ -104,7 +104,7 @@ PHP_METHOD(Random_Randomizer, nextInt)
 		zend_throw_exception(random_ce_Random_RandomException, "Generated value exceeds size of int", 0);
 		RETURN_THROWS();
 	}
-	
+
 	RETURN_LONG((zend_long) (result >> 1));
 }
 /* }}} */
@@ -141,8 +141,7 @@ PHP_METHOD(Random_Randomizer, getBytes)
 	php_random_randomizer *randomizer = Z_RANDOM_RANDOMIZER_P(ZEND_THIS);
 	zend_string *retval;
 	zend_long length;
-	uint64_t result;
-	size_t total_size = 0, required_size;
+	size_t total_size = 0;
 
 	ZEND_PARSE_PARAMETERS_START(1, 1)
 		Z_PARAM_LONG(length)
@@ -154,17 +153,16 @@ PHP_METHOD(Random_Randomizer, getBytes)
 	}
 
 	retval = zend_string_alloc(length, 0);
-	required_size = length;
 
-	while (total_size < required_size) {
-		result = randomizer->algo->generate(randomizer->status);
+	while (total_size < length) {
+		uint64_t result = randomizer->algo->generate(randomizer->status);
 		if (EG(exception)) {
 			zend_string_free(retval);
 			RETURN_THROWS();
 		}
 		for (size_t i = 0; i < randomizer->status->last_generated_size; i++) {
 			ZSTR_VAL(retval)[total_size++] = (result >> (i * 8)) & 0xff;
-			if (total_size >= required_size) {
+			if (total_size >= length) {
 				break;
 			}
 		}
@@ -272,12 +270,22 @@ PHP_METHOD(Random_Randomizer, __unserialize)
 		Z_PARAM_ARRAY_HT(d);
 	ZEND_PARSE_PARAMETERS_END();
 
+	/* Verify the expected number of elements, this implicitly ensures that no additional elements are present. */
+	if (zend_hash_num_elements(d) != 1) {
+		zend_throw_exception(NULL, "Invalid serialization data for Random\\Randomizer object", 0);
+		RETURN_THROWS();
+	}
+
 	members_zv = zend_hash_index_find(d, 0);
 	if (!members_zv || Z_TYPE_P(members_zv) != IS_ARRAY) {
 		zend_throw_exception(NULL, "Invalid serialization data for Random\\Randomizer object", 0);
 		RETURN_THROWS();
 	}
 	object_properties_load(&randomizer->std, Z_ARRVAL_P(members_zv));
+	if (EG(exception)) {
+		zend_throw_exception(NULL, "Invalid serialization data for Random\\Randomizer object", 0);
+		RETURN_THROWS();
+	}
 
 	zengine = zend_read_property(randomizer->std.ce, &randomizer->std, "engine", strlen("engine"), 1, NULL);
 	if (Z_TYPE_P(zengine) != IS_OBJECT || !instanceof_function(Z_OBJCE_P(zengine), random_ce_Random_Engine)) {

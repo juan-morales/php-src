@@ -1155,7 +1155,7 @@ static zend_class_entry *register_class_ZipArchive(zend_class_entry *class_entry
 	zend_string_release(const_EM_UNKNOWN_name);
 
 	zval const_LIBZIP_VERSION_value;
-	zend_string *const_LIBZIP_VERSION_value_str = zend_string_init(LIBZIP_VERSION_STR, sizeof(LIBZIP_VERSION_STR) - 1, 1);
+	zend_string *const_LIBZIP_VERSION_value_str = zend_string_init(LIBZIP_VERSION_STR, strlen(LIBZIP_VERSION_STR), 1);
 	ZVAL_STR(&const_LIBZIP_VERSION_value, const_LIBZIP_VERSION_value_str);
 	zend_string *const_LIBZIP_VERSION_name = zend_string_init_interned("LIBZIP_VERSION", sizeof("LIBZIP_VERSION") - 1, 1);
 	zend_declare_class_constant_ex(class_entry, const_LIBZIP_VERSION_name, &const_LIBZIP_VERSION_value, ZEND_ACC_PUBLIC, NULL);

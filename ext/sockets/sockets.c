@@ -76,8 +76,16 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(sockets)
 
+#define SUN_LEN_NO_UB(su) (sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
+/* The SUN_LEN macro does pointer arithmetics on NULL which triggers errors in the Clang UBSAN build */
+#ifdef __has_feature
+# if __has_feature(undefined_behavior_sanitizer)
+#  undef SUN_LEN
+#  define SUN_LEN(su) SUN_LEN_NO_UB(su)
+# endif
+#endif
 #ifndef SUN_LEN
-#define SUN_LEN(su) (sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
+# define SUN_LEN(su) SUN_LEN_NO_UB(su)
 #endif
 
 #ifndef PF_INET
@@ -101,7 +109,6 @@ static zend_object *socket_create_object(zend_class_entry *class_type) {
 
 	zend_object_std_init(&intern->std, class_type);
 	object_properties_init(&intern->std, class_type);
-	intern->std.handlers = &socket_object_handlers;
 
 	intern->bsd_socket = -1; /* invalid socket */
 	intern->type		 = PF_UNSPEC;
@@ -163,7 +170,6 @@ static zend_object *address_info_create_object(zend_class_entry *class_type) {
 
 	zend_object_std_init(&intern->std, class_type);
 	object_properties_init(&intern->std, class_type);
-	intern->std.handlers = &address_info_object_handlers;
 
 	return &intern->std;
 }
@@ -428,6 +434,7 @@ static PHP_MINIT_FUNCTION(sockets)
 
 	socket_ce = register_class_Socket();
 	socket_ce->create_object = socket_create_object;
+	socket_ce->default_object_handlers = &socket_object_handlers;
 
 	memcpy(&socket_object_handlers, &std_object_handlers, sizeof(zend_object_handlers));
 	socket_object_handlers.offset = XtOffsetOf(php_socket, std);
@@ -439,6 +446,7 @@ static PHP_MINIT_FUNCTION(sockets)
 
 	address_info_ce = register_class_AddressInfo();
 	address_info_ce->create_object = address_info_create_object;
+	address_info_ce->default_object_handlers = &address_info_object_handlers;
 
 	memcpy(&address_info_object_handlers, &std_object_handlers, sizeof(zend_object_handlers));
 	address_info_object_handlers.offset = XtOffsetOf(php_addrinfo, std);
@@ -605,7 +613,9 @@ PHP_FUNCTION(socket_select)
 		RETURN_THROWS();
 	}
 
-	PHP_SAFE_MAX_FD(max_fd, 0); /* someone needs to make this look more like stream_socket_select */
+	if (!PHP_SAFE_MAX_FD(max_fd, 0)) {
+		RETURN_FALSE;
+	}
 
 	/* If seconds is not set to null, build the timeval, else we wait indefinitely */
 	if (!sec_is_null) {
@@ -1733,6 +1743,7 @@ PHP_FUNCTION(socket_get_option)
 				return;
 			}
 #endif
+
 		}
 	}
 
@@ -1948,6 +1959,40 @@ PHP_FUNCTION(socket_set_option)
 			}
 			opt_ptr = Z_STRVAL_P(arg4);
 			optlen = Z_STRLEN_P(arg4);
+			break;
+		}
+#endif
+
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+		case SO_ATTACH_REUSEPORT_CBPF: {
+			convert_to_long(arg4);
+
+			if (!Z_LVAL_P(arg4)) {
+				ov = 1;
+				optlen = sizeof(ov);
+				opt_ptr = &ov;
+				optname = SO_DETACH_BPF;
+			} else {
+				uint32_t k = (uint32_t)Z_LVAL_P(arg4);
+				static struct sock_filter cbpf[8] = {0};
+				static struct sock_fprog bpfprog;
+
+				switch (k) {
+                		case SKF_AD_CPU:
+					cbpf[0].code = (BPF_LD|BPF_W|BPF_ABS);
+                    			cbpf[0].k = (uint32_t)(SKF_AD_OFF + k);
+					cbpf[1].code = (BPF_RET|BPF_A);
+                    			bpfprog.len = 2;
+                    		break;
+                		default:
+                    			php_error_docref(NULL, E_WARNING, "Unsupported CBPF filter");
+                    			RETURN_FALSE;
+                		}
+
+				bpfprog.filter = cbpf;
+				optlen = sizeof(bpfprog);
+				opt_ptr = &bpfprog;
+			}
 			break;
 		}
 #endif

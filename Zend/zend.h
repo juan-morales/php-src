@@ -20,7 +20,7 @@
 #ifndef ZEND_H
 #define ZEND_H
 
-#define ZEND_VERSION "4.2.0-dev"
+#define ZEND_VERSION "4.3.0-dev"
 
 #define ZEND_ENGINE_3
 
@@ -181,6 +181,8 @@ struct _zend_class_entry {
 	zend_function *__debugInfo;
 	zend_function *__serialize;
 	zend_function *__unserialize;
+
+	const zend_object_handlers *default_object_handlers;
 
 	/* allocated only if class implements Iterator or IteratorAggregate interface */
 	zend_class_iterator_funcs *iterator_funcs_ptr;

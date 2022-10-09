@@ -29,6 +29,7 @@
 #include "zend_enum.h"
 #include "zend_attributes.h"
 #include "zend_constants.h"
+#include "zend_observer.h"
 
 ZEND_API zend_class_entry* (*zend_inheritance_cache_get)(zend_class_entry *ce, zend_class_entry *parent, zend_class_entry **traits_and_interfaces) = NULL;
 ZEND_API zend_class_entry* (*zend_inheritance_cache_add)(zend_class_entry *ce, zend_class_entry *proto, zend_class_entry *parent, zend_class_entry **traits_and_interfaces, HashTable *dependencies) = NULL;
@@ -1471,6 +1472,7 @@ ZEND_API void zend_do_inheritance_ex(zend_class_entry *ce, zend_class_entry *par
 		zend_string_release_ex(ce->parent_name, 0);
 	}
 	ce->parent = parent_ce;
+	ce->default_object_handlers = parent_ce->default_object_handlers;
 	ce->ce_flags |= ZEND_ACC_RESOLVED_PARENT;
 
 	/* Inherit properties */
@@ -3134,18 +3136,24 @@ static zend_always_inline bool register_early_bound_ce(zval *delayed_early_bindi
 		if (EXPECTED(!(ce->ce_flags & ZEND_ACC_PRELOADED))) {
 			if (zend_hash_set_bucket_key(EG(class_table), (Bucket *)delayed_early_binding, lcname) != NULL) {
 				Z_CE_P(delayed_early_binding) = ce;
+				zend_observer_class_linked_notify(ce, lcname);
 				return true;
 			}
 		} else {
 			/* If preloading is used, don't replace the existing bucket, add a new one. */
 			if (zend_hash_add_ptr(EG(class_table), lcname, ce) != NULL) {
+				zend_observer_class_linked_notify(ce, lcname);
 				return true;
 			}
 		}
 		zend_error_noreturn(E_COMPILE_ERROR, "Cannot declare %s %s, because the name is already in use", zend_get_object_type(ce), ZSTR_VAL(ce->name));
 		return false;
 	}
-	return zend_hash_add_ptr(CG(class_table), lcname, ce) != NULL;
+	if (zend_hash_add_ptr(CG(class_table), lcname, ce) != NULL) {
+		zend_observer_class_linked_notify(ce, lcname);
+		return true;
+	}
+	return false;
 }
 
 ZEND_API zend_class_entry *zend_try_early_bind(zend_class_entry *ce, zend_class_entry *parent_ce, zend_string *lcname, zval *delayed_early_binding) /* {{{ */

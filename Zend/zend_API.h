@@ -272,11 +272,13 @@ typedef struct _zend_fcall_info_cache {
 	{															\
 		memset(&class_container, 0, sizeof(zend_class_entry)); \
 		class_container.name = zend_string_init_interned(class_name, class_name_len, 1); \
+		class_container.default_object_handlers = &std_object_handlers;	\
 		class_container.info.internal.builtin_functions = functions;	\
 	}
 
 #define INIT_CLASS_ENTRY_INIT_METHODS(class_container, functions) \
 	{															\
+		class_container.default_object_handlers = &std_object_handlers;	\
 		class_container.constructor = NULL;						\
 		class_container.destructor = NULL;						\
 		class_container.clone = NULL;							\
@@ -823,8 +825,18 @@ END_EXTERN_C()
 #define CHECK_ZVAL_STRING(z)
 #endif
 
-#define CHECK_ZVAL_NULL_PATH(p) (Z_STRLEN_P(p) != strlen(Z_STRVAL_P(p)))
-#define CHECK_NULL_PATH(p, l) (strlen(p) != (size_t)(l))
+static zend_always_inline bool zend_str_has_nul_byte(const zend_string *str)
+{
+	return ZSTR_LEN(str) != strlen(ZSTR_VAL(str));
+}
+static zend_always_inline bool zend_char_has_nul_byte(const char *s, size_t known_length)
+{
+	return known_length != strlen(s);
+}
+
+/* Compatibility with PHP 8.1 and below */
+#define CHECK_ZVAL_NULL_PATH(p) zend_str_has_nul_byte(Z_STR_P(p))
+#define CHECK_NULL_PATH(p, l) zend_char_has_nul_byte(p, l)
 
 #define ZVAL_STRINGL(z, s, l) do {				\
 		ZVAL_NEW_STR(z, zend_string_init(s, l, 0));		\
@@ -1528,6 +1540,10 @@ ZEND_API ZEND_COLD void zend_argument_value_error(uint32_t arg_num, const char *
 		SEPARATE_ZVAL_NOREF(_arg); \
 	}
 
+/* get the zval* for a previously parsed argument */
+#define Z_PARAM_GET_PREV_ZVAL(dest) \
+	zend_parse_arg_zval_deref(_arg, &dest, 0);
+
 /* old "|" */
 #define Z_PARAM_OPTIONAL \
 	_optional = 1;
@@ -1689,6 +1705,10 @@ ZEND_API ZEND_COLD void zend_argument_value_error(uint32_t arg_num, const char *
 
 #define Z_PARAM_FUNC_OR_NULL(dest_fci, dest_fcc) \
 	Z_PARAM_FUNC_EX(dest_fci, dest_fcc, 1, 0)
+
+#define Z_PARAM_FUNC_OR_NULL_WITH_ZVAL(dest_fci, dest_fcc, dest_zp) \
+	Z_PARAM_FUNC_EX(dest_fci, dest_fcc, 1, 0) \
+	Z_PARAM_GET_PREV_ZVAL(dest_zp)
 
 /* old "h" */
 #define Z_PARAM_ARRAY_HT_EX2(dest, check_null, deref, separate) \

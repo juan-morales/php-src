@@ -1105,11 +1105,11 @@ const SOCKET_ESRMNT = UNKNOWN;
  */
 const SOCKET_ECOMM = UNKNOWN;
 #endif
-#ifdef PHP_SOCKET_EPROTO
+#ifdef EPROTO
 /**
  * Protocol error
  * @var int
- * @cvalue PHP_SOCKET_EPROTO
+ * @cvalue EPROTO
  */
 const SOCKET_EPROTO = UNKNOWN;
 #endif
@@ -1588,7 +1588,7 @@ const AI_NUMERICSERV = UNKNOWN;
 const SOL_LOCAL = UNKNOWN;
 #endif
 
-#if defined(IPV6_RECVPKTINFO) && HAVE_IPV6
+#if (defined(IPV6_RECVPKTINFO) && HAVE_IPV6)
 /**
  * IPv6 ancillary data
  * @var int
@@ -1601,7 +1601,7 @@ const IPV6_RECVPKTINFO = UNKNOWN;
  */
 const IPV6_PKTINFO = UNKNOWN;
 #endif
-#if defined(IPV6_RECVHOPLIMIT) && HAVE_IPV6
+#if (defined(IPV6_RECVHOPLIMIT) && HAVE_IPV6)
 /**
  * @var int
  * @cvalue IPV6_RECVHOPLIMIT
@@ -1614,7 +1614,7 @@ const IPV6_RECVHOPLIMIT = UNKNOWN;
 const IPV6_HOPLIMIT = UNKNOWN;
 #endif
 
-#if defined(IPV6_RECVTCLASS) && HAVE_IPV6
+#if (defined(IPV6_RECVTCLASS) && HAVE_IPV6)
 /**
  * @var int
  * @cvalue IPV6_RECVTCLASS
@@ -1677,6 +1677,27 @@ const SCM_CREDS = UNKNOWN;
  * @cvalue LOCAL_CREDS
  */
 const LOCAL_CREDS = UNKNOWN;
+#endif
+#if defined(SO_ATTACH_REUSEPORT_CBPF)
+/**
+ * @var int
+ * @cvalue SO_ATTACH_REUSEPORT_CBPF
+ */
+const SO_ATTACH_REUSEPORT_CBPF = UNKNOWN;
+#endif
+#if defined(SO_DETACH_FILTER)
+/**
+ * @var int
+ * @cvalue SO_DETACH_FILTER
+ */
+const SO_DETACH_FILTER = UNKNOWN;
+#endif
+#if defined(SO_DETACH_BPF)
+/**
+ * @var int
+ * @cvalue SO_DETACH_BPF
+ */
+const SO_DETACH_BPF = UNKNOWN;
 #endif
 
 /**

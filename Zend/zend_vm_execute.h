@@ -3175,6 +3175,19 @@ static ZEND_OPCODE_HANDLER_RET ZEND_FASTCALL ZEND_HANDLE_EXCEPTION_SPEC_HANDLER(
 		 */
 		const zend_live_range *range = find_live_range(
 			&EX(func)->op_array, throw_op_num, throw_op->op1.var);
+		/* free op1 of the corresponding RETURN */
+		for (i = throw_op_num; i < range->end; i++) {
+			if (EX(func)->op_array.opcodes[i].opcode == ZEND_FREE
+			 || EX(func)->op_array.opcodes[i].opcode == ZEND_FE_FREE) {
+				/* pass */
+			} else {
+				if (EX(func)->op_array.opcodes[i].opcode == ZEND_RETURN
+				 && (EX(func)->op_array.opcodes[i].op1_type & (IS_VAR|IS_TMP_VAR))) {
+					zval_ptr_dtor(EX_VAR(EX(func)->op_array.opcodes[i].op1.var));
+				}
+				break;
+			}
+		}
 		throw_op_num = range->end;
 	}
 
@@ -23041,7 +23054,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -23172,7 +23184,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -23303,7 +23314,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -23434,7 +23444,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -25754,7 +25763,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -25885,7 +25893,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -26016,7 +26023,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -26147,7 +26153,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -29961,7 +29966,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -30092,7 +30096,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -30223,7 +30226,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -30354,7 +30356,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -32542,7 +32543,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -32673,7 +32673,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -32804,7 +32803,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -32935,7 +32933,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -34416,7 +34413,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -34547,7 +34543,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -34678,7 +34673,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -34809,7 +34803,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -36893,7 +36886,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -37024,7 +37016,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -37155,7 +37146,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -37286,7 +37276,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -41070,7 +41059,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -41201,7 +41189,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -41332,7 +41319,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -41463,7 +41449,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -44854,7 +44839,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -44985,7 +44969,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -45116,7 +45099,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -45247,7 +45229,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -50177,7 +50158,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -50308,7 +50288,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -50439,7 +50418,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {
@@ -50570,7 +50548,6 @@ assign_object:
 		if (EXPECTED(zobj->ce == CACHED_PTR(opline->extended_value))) {
 			void **cache_slot = CACHE_ADDR(opline->extended_value);
 			uintptr_t prop_offset = (uintptr_t)CACHED_PTR_EX(cache_slot + 1);
-			zend_object *zobj = Z_OBJ_P(object);
 			zval *property_val;
 
 			if (EXPECTED(IS_VALID_PROPERTY_OFFSET(prop_offset))) {

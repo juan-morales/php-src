@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <signal.h>
 
 #ifdef PHP_WIN32
 # include <process.h>
@@ -47,6 +48,14 @@
 
 #if HAVE_DLFCN_H
 #include <dlfcn.h>
+#endif
+
+#ifdef HAVE_PRCTL
+# include <sys/prctl.h>
+#endif
+
+#ifdef HAVE_PROCCTL
+# include <sys/procctl.h>
 #endif
 
 #include "SAPI.h"
@@ -202,6 +211,7 @@ typedef struct php_cli_server_http_response_status_code_pair {
 static php_cli_server_http_response_status_code_pair template_map[] = {
 	{ 400, "<h1>%s</h1><p>Your browser sent a request that this server could not understand.</p>" },
 	{ 404, "<h1>%s</h1><p>The requested resource <code class=\"url\">%s</code> was not found on this server.</p>" },
+	{ 405, "<h1>%s</h1><p>Requested method not allowed.</p>" },
 	{ 500, "<h1>%s</h1><p>The server is temporarily unavailable.</p>" },
 	{ 501, "<h1>%s</h1><p>Request method not supported.</p>" }
 };
@@ -1672,6 +1682,7 @@ static void php_cli_server_client_save_header(php_cli_server_client *client)
 	zend_hash_add(&client->request.headers_original_case, client->current_header_name, &tmp);
 
 	zend_string_release_ex(lc_header_name, /* persistent */ true);
+	zend_string_release_ex(client->current_header_name, /* persistent */ true);
 
 	client->current_header_name = NULL;
 	client->current_header_value = NULL;
@@ -1980,49 +1991,51 @@ static zend_result php_cli_server_send_error_page(php_cli_server *server, php_cl
 	php_cli_server_content_sender_ctor(&client->content_sender);
 	client->content_sender_initialized = true;
 
-	escaped_request_uri = php_escape_html_entities_ex((const unsigned char *) ZSTR_VAL(client->request.request_uri), ZSTR_LEN(client->request.request_uri), 0, ENT_QUOTES, NULL, /* double_encode */ 0, /* quiet */ 0);
+	if (client->request.request_method != PHP_HTTP_HEAD) {
+		escaped_request_uri = php_escape_html_entities_ex((const unsigned char *) ZSTR_VAL(client->request.request_uri), ZSTR_LEN(client->request.request_uri), 0, ENT_QUOTES, NULL, /* double_encode */ 0, /* quiet */ 0);
 
-	{
-		static const char prologue_template[] = "<!doctype html><html><head><title>%d %s</title>";
-		php_cli_server_chunk *chunk = php_cli_server_chunk_heap_new_self_contained(strlen(prologue_template) + 3 + strlen(status_string) + 1);
-		if (!chunk) {
-			goto fail;
+		{
+			static const char prologue_template[] = "<!doctype html><html><head><title>%d %s</title>";
+			php_cli_server_chunk *chunk = php_cli_server_chunk_heap_new_self_contained(strlen(prologue_template) + 3 + strlen(status_string) + 1);
+			if (!chunk) {
+				goto fail;
+			}
+			snprintf(chunk->data.heap.p, chunk->data.heap.len, prologue_template, status, status_string);
+			chunk->data.heap.len = strlen(chunk->data.heap.p);
+			php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
 		}
-		snprintf(chunk->data.heap.p, chunk->data.heap.len, prologue_template, status, status_string);
-		chunk->data.heap.len = strlen(chunk->data.heap.p);
-		php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
-	}
-	{
-		php_cli_server_chunk *chunk = php_cli_server_chunk_immortal_new(php_cli_server_css, sizeof(php_cli_server_css) - 1);
-		if (!chunk) {
-			goto fail;
+		{
+			php_cli_server_chunk *chunk = php_cli_server_chunk_immortal_new(php_cli_server_css, sizeof(php_cli_server_css) - 1);
+			if (!chunk) {
+				goto fail;
+			}
+			php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
 		}
-		php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
-	}
-	{
-		static const char template[] = "</head><body>";
-		php_cli_server_chunk *chunk = php_cli_server_chunk_immortal_new(template, sizeof(template) - 1);
-		if (!chunk) {
-			goto fail;
+		{
+			static const char template[] = "</head><body>";
+			php_cli_server_chunk *chunk = php_cli_server_chunk_immortal_new(template, sizeof(template) - 1);
+			if (!chunk) {
+				goto fail;
+			}
+			php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
 		}
-		php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
-	}
-	{
-		php_cli_server_chunk *chunk = php_cli_server_chunk_heap_new_self_contained(strlen(content_template) + ZSTR_LEN(escaped_request_uri) + 3 + strlen(status_string) + 1);
-		if (!chunk) {
-			goto fail;
+		{
+			php_cli_server_chunk *chunk = php_cli_server_chunk_heap_new_self_contained(strlen(content_template) + ZSTR_LEN(escaped_request_uri) + 3 + strlen(status_string) + 1);
+			if (!chunk) {
+				goto fail;
+			}
+			snprintf(chunk->data.heap.p, chunk->data.heap.len, content_template, status_string, ZSTR_VAL(escaped_request_uri));
+			chunk->data.heap.len = strlen(chunk->data.heap.p);
+			php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
 		}
-		snprintf(chunk->data.heap.p, chunk->data.heap.len, content_template, status_string, ZSTR_VAL(escaped_request_uri));
-		chunk->data.heap.len = strlen(chunk->data.heap.p);
-		php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
-	}
-	{
-		static const char epilogue_template[] = "</body></html>";
-		php_cli_server_chunk *chunk = php_cli_server_chunk_immortal_new(epilogue_template, sizeof(epilogue_template) - 1);
-		if (!chunk) {
-			goto fail;
+		{
+			static const char epilogue_template[] = "</body></html>";
+			php_cli_server_chunk *chunk = php_cli_server_chunk_immortal_new(epilogue_template, sizeof(epilogue_template) - 1);
+			if (!chunk) {
+				goto fail;
+			}
+			php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
 		}
-		php_cli_server_buffer_append(&client->content_sender.buffer, chunk);
 	}
 
 	{
@@ -2038,6 +2051,15 @@ static zend_result php_cli_server_send_error_page(php_cli_server *server, php_cl
 		smart_str_appends_ex(&buffer, "Content-Length: ", 1);
 		smart_str_append_unsigned_ex(&buffer, php_cli_server_buffer_size(&client->content_sender.buffer), 1);
 		smart_str_appendl_ex(&buffer, "\r\n", 2, 1);
+		if (status == 405) {
+			smart_str_appends_ex(&buffer, "Allow: ", 1);
+			smart_str_appends_ex(&buffer, php_http_method_str(PHP_HTTP_GET), 1);
+			smart_str_appends_ex(&buffer, ", ", 1);
+			smart_str_appends_ex(&buffer, php_http_method_str(PHP_HTTP_HEAD), 1);
+			smart_str_appends_ex(&buffer, ", ", 1);
+			smart_str_appends_ex(&buffer, php_http_method_str(PHP_HTTP_POST), 1);
+			smart_str_appendl_ex(&buffer, "\r\n", 2, 1);
+		}
 		smart_str_appendl_ex(&buffer, "\r\n", 2, 1);
 
 		chunk = php_cli_server_chunk_heap_new(buffer.s, ZSTR_VAL(buffer.s), ZSTR_LEN(buffer.s));
@@ -2053,14 +2075,18 @@ static zend_result php_cli_server_send_error_page(php_cli_server *server, php_cl
 	if (errstr) {
 		pefree(errstr, 1);
 	}
-	zend_string_free(escaped_request_uri);
+	if (escaped_request_uri) {
+		zend_string_free(escaped_request_uri);
+	}
 	return SUCCESS;
 
 fail:
 	if (errstr) {
 		pefree(errstr, 1);
 	}
-	zend_string_free(escaped_request_uri);
+	if (escaped_request_uri) {
+		zend_string_free(escaped_request_uri);
+	}
 	return FAILURE;
 } /* }}} */
 
@@ -2087,6 +2113,12 @@ static zend_result php_cli_server_begin_send_static(php_cli_server *server, php_
 {
 	int fd;
 	int status = 200;
+
+	if (client->request.request_method == PHP_HTTP_DELETE
+		|| client->request.request_method == PHP_HTTP_PUT
+		|| client->request.request_method == PHP_HTTP_PATCH) {
+		return php_cli_server_send_error_page(server, client, 405);
+	}
 
 	if (client->request.path_translated && strlen(client->request.path_translated) != client->request.path_translated_len) {
 		/* can't handle paths that contain nul bytes */
@@ -2115,7 +2147,9 @@ static zend_result php_cli_server_begin_send_static(php_cli_server *server, php_
 
 	php_cli_server_content_sender_ctor(&client->content_sender);
 	client->content_sender_initialized = true;
-	client->file_fd = fd;
+	if (client->request.request_method != PHP_HTTP_HEAD) {
+		client->file_fd = fd;
+	}
 
 	{
 		php_cli_server_chunk *chunk;
@@ -2408,6 +2442,24 @@ static char *php_cli_server_parse_addr(const char *addr, int *pport) {
 	return pestrndup(addr, end - addr, 1);
 }
 
+#if defined(HAVE_PRCTL) || defined(HAVE_PROCCTL)
+static void php_cli_server_worker_install_pdeathsig(void)
+{
+	// Ignore failure to register PDEATHSIG, it's not available on all platforms anyway
+#if defined(HAVE_PRCTL)
+	prctl(PR_SET_PDEATHSIG, SIGTERM);
+#elif defined(HAVE_PROCCTL)
+	int signal = SIGTERM;
+	procctl(P_PID, 0, PROC_PDEATHSIG_CTL, &signal);
+#endif
+
+	// Check if parent has exited just after the fork
+	if (getppid() != php_cli_server_master) {
+		exit(1);
+	}
+}
+#endif
+
 static void php_cli_server_startup_workers(void) {
 	char *workers = getenv("PHP_CLI_SERVER_WORKERS");
 	if (!workers) {
@@ -2435,6 +2487,9 @@ static void php_cli_server_startup_workers(void) {
 					php_cli_server_worker + 1;
 				return;
 			} else if (pid == 0) {
+#if defined(HAVE_PRCTL) || defined(HAVE_PROCCTL)
+				php_cli_server_worker_install_pdeathsig();
+#endif
 				return;
 			} else {
 				php_cli_server_workers[php_cli_server_worker] = pid;

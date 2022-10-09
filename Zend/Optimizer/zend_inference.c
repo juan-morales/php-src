@@ -1017,15 +1017,6 @@ static bool zend_inference_calc_range(const zend_op_array *op_array, zend_ssa *s
 		}
 		return (tmp->min <= tmp->max);
 	} else if (ssa->vars[var].definition < 0) {
-		if (var < op_array->last_var &&
-		    op_array->function_name) {
-
-			tmp->min = 0;
-			tmp->max = 0;
-			tmp->underflow = 0;
-			tmp->overflow = 0;
-			return 1;
-		}
 		return 0;
 	}
 	line = ssa->vars[var].definition;
@@ -1976,6 +1967,9 @@ static uint32_t assign_dim_array_result_type(
 				tmp |= MAY_BE_ARRAY_KEY_STRING;
 				if (dim_op_type != IS_CONST) {
 					// FIXME: numeric string
+					if (arr_type & (MAY_BE_UNDEF|MAY_BE_NULL|MAY_BE_FALSE)) {
+						tmp |= MAY_BE_ARRAY_PACKED;
+					}
 					tmp |= MAY_BE_HASH_ONLY(arr_type) ? MAY_BE_ARRAY_NUMERIC_HASH : MAY_BE_ARRAY_KEY_LONG;
 				}
 			}
@@ -2311,7 +2305,13 @@ static zend_always_inline zend_result _zend_update_type_info(
 	 * unreachable code. Propagate the empty result early, so that that the following
 	 * code may assume that operands have at least one type. */
 	if (!(t1 & (MAY_BE_ANY|MAY_BE_UNDEF|MAY_BE_CLASS))
-		|| !(t2 & (MAY_BE_ANY|MAY_BE_UNDEF|MAY_BE_CLASS))) {
+	 || !(t2 & (MAY_BE_ANY|MAY_BE_UNDEF|MAY_BE_CLASS))
+	 || ((opline->opcode == ZEND_ASSIGN_DIM_OP
+	   || opline->opcode == ZEND_ASSIGN_OBJ_OP
+	   || opline->opcode == ZEND_ASSIGN_STATIC_PROP_OP
+	   || opline->opcode == ZEND_ASSIGN_DIM
+	   || opline->opcode == ZEND_ASSIGN_OBJ)
+	    && !(OP1_DATA_INFO() & (MAY_BE_ANY|MAY_BE_UNDEF|MAY_BE_CLASS)) /*&& 0*/)) {
 		tmp = 0;
 		if (ssa_op->result_def >= 0 && !(ssa_var_info[ssa_op->result_def].type & MAY_BE_REF)) {
 			UPDATE_SSA_TYPE(tmp, ssa_op->result_def);
@@ -2321,6 +2321,15 @@ static zend_always_inline zend_result _zend_update_type_info(
 		}
 		if (ssa_op->op2_def >= 0 && !(ssa_var_info[ssa_op->op2_def].type & MAY_BE_REF)) {
 			UPDATE_SSA_TYPE(tmp, ssa_op->op2_def);
+		}
+		if (opline->opcode == ZEND_ASSIGN_DIM_OP
+		 || opline->opcode == ZEND_ASSIGN_OBJ_OP
+		 || opline->opcode == ZEND_ASSIGN_STATIC_PROP_OP
+		 || opline->opcode == ZEND_ASSIGN_DIM
+		 || opline->opcode == ZEND_ASSIGN_OBJ) {
+			if ((ssa_op+1)->op1_def >= 0 && !(ssa_var_info[(ssa_op+1)->op1_def].type & MAY_BE_REF)) {
+				UPDATE_SSA_TYPE(tmp, (ssa_op+1)->op1_def);
+			}
 		}
 		return SUCCESS;
 	}
@@ -3405,6 +3414,9 @@ static zend_always_inline zend_result _zend_update_type_info(
 				opline->opcode != ZEND_FETCH_DIM_R && opline->opcode != ZEND_FETCH_DIM_IS
 					&& opline->opcode != ZEND_FETCH_LIST_R,
 				opline->op2_type == IS_UNUSED);
+			if (opline->opcode == ZEND_FETCH_DIM_FUNC_ARG && (t1 & (MAY_BE_TRUE|MAY_BE_LONG|MAY_BE_DOUBLE|MAY_BE_RESOURCE))) {
+				tmp |= MAY_BE_NULL;
+			}
 			if (opline->opcode == ZEND_FETCH_DIM_IS && (t1 & MAY_BE_STRING)) {
 				tmp |= MAY_BE_NULL;
 			}
@@ -4196,52 +4208,7 @@ static void zend_func_return_info(const zend_op_array   *op_array,
 				if (opline->op1_type == IS_CONST) {
 					zval *zv = CRT_CONSTANT(opline->op1);
 
-					if (Z_TYPE_P(zv) == IS_NULL) {
-						if (tmp_has_range < 0) {
-							tmp_has_range = 1;
-							tmp_range.underflow = 0;
-							tmp_range.min = 0;
-							tmp_range.max = 0;
-							tmp_range.overflow = 0;
-						} else if (tmp_has_range) {
-							if (!tmp_range.underflow) {
-								tmp_range.min = MIN(tmp_range.min, 0);
-							}
-							if (!tmp_range.overflow) {
-								tmp_range.max = MAX(tmp_range.max, 0);
-							}
-						}
-					} else if (Z_TYPE_P(zv) == IS_FALSE) {
-						if (tmp_has_range < 0) {
-							tmp_has_range = 1;
-							tmp_range.underflow = 0;
-							tmp_range.min = 0;
-							tmp_range.max = 0;
-							tmp_range.overflow = 0;
-						} else if (tmp_has_range) {
-							if (!tmp_range.underflow) {
-								tmp_range.min = MIN(tmp_range.min, 0);
-							}
-							if (!tmp_range.overflow) {
-								tmp_range.max = MAX(tmp_range.max, 0);
-							}
-						}
-					} else if (Z_TYPE_P(zv) == IS_TRUE) {
-						if (tmp_has_range < 0) {
-							tmp_has_range = 1;
-							tmp_range.underflow = 0;
-							tmp_range.min = 1;
-							tmp_range.max = 1;
-							tmp_range.overflow = 0;
-						} else if (tmp_has_range) {
-							if (!tmp_range.underflow) {
-								tmp_range.min = MIN(tmp_range.min, 1);
-							}
-							if (!tmp_range.overflow) {
-								tmp_range.max = MAX(tmp_range.max, 1);
-							}
-						}
-					} else if (Z_TYPE_P(zv) == IS_LONG) {
+					if (Z_TYPE_P(zv) == IS_LONG) {
 						if (tmp_has_range < 0) {
 							tmp_has_range = 1;
 							tmp_range.underflow = 0;

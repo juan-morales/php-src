@@ -17,7 +17,7 @@ dnl Basic autoconf initialization, generation of config.nice.
 dnl ----------------------------------------------------------------------------
 
 AC_PREREQ([2.68])
-AC_INIT([PHP],[8.2.0-dev],[https://github.com/php/php-src/issues],[php],[https://www.php.net])
+AC_INIT([PHP],[8.3.0-dev],[https://github.com/php/php-src/issues],[php],[https://www.php.net])
 AC_CONFIG_SRCDIR([main/php_version.h])
 AC_CONFIG_AUX_DIR([build])
 AC_PRESERVE_HELP_ORDER
@@ -510,6 +510,10 @@ dnl Check __builtin_cpu_init
 PHP_CHECK_BUILTIN_CPU_INIT
 dnl Check __builtin_cpu_supports
 PHP_CHECK_BUILTIN_CPU_SUPPORTS
+dnl Check prctl
+PHP_CHECK_PRCTL
+dnl Check procctl
+PHP_CHECK_PROCCTL
 
 dnl Check for __alignof__ support in the compiler
 AC_CACHE_CHECK(whether the compiler supports __alignof__, ac_cv_alignof_exists,[
@@ -691,7 +695,7 @@ if test "$ac_cv_func_getaddrinfo" = yes; then
   AC_DEFINE(HAVE_GETADDRINFO,1,[Define if you have the getaddrinfo function])
 fi
 
-AC_REPLACE_FUNCS(strlcat strlcpy explicit_bzero getopt reallocarray)
+AC_REPLACE_FUNCS(strlcat strlcpy explicit_bzero getopt)
 AC_FUNC_ALLOCA
 PHP_TIME_R_TYPE
 PHP_CHECK_IN_ADDR_T
@@ -1052,7 +1056,7 @@ PHP_HELP_SEPARATOR([Extensions:
 
   --with-EXTENSION=[shared[,PATH]]
 
-    NOTE: Not all extensions can be build as 'shared'.
+    NOTE: Not all extensions can be built as 'shared'.
 
     Example: --with-foobar=shared,/usr/local/foobar/
 
@@ -1618,7 +1622,7 @@ PHP_ADD_SOURCES(main, main.c snprintf.c spprintf.c \
        php_ini_builder.c \
        php_ini.c SAPI.c rfc1867.c php_content_types.c strlcpy.c \
        strlcat.c explicit_bzero.c reentrancy.c php_variables.c php_ticks.c \
-       network.c php_open_temporary_file.c php_odbc_utils.c safe_bcmp.c reallocarray.c \
+       network.c php_open_temporary_file.c php_odbc_utils.c safe_bcmp.c \
        output.c getopt.c php_syslog.c, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
 
 PHP_ADD_SOURCES_X(main, fastcgi.c, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1, PHP_FASTCGI_OBJS, no)

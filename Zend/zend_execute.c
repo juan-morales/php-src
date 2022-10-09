@@ -830,6 +830,23 @@ ZEND_COLD zend_never_inline void zend_verify_property_type_error(zend_property_i
 	zend_string_release(type_str);
 }
 
+ZEND_COLD zend_never_inline void zend_magic_get_property_type_inconsistency_error(zend_property_info *info, zval *property)
+{
+	/* we _may_ land here in case reading already errored and runtime cache thus has not been updated (i.e. it contains a valid but unrelated info) */
+	if (EG(exception)) {
+		return;
+	}
+
+	zend_string *type_str = zend_type_to_string(info->type);
+	zend_type_error("Value of type %s returned from %s::__get() must be compatible with unset property %s::$%s of type %s",
+		zend_zval_type_name(property),
+		ZSTR_VAL(info->ce->name),
+		ZSTR_VAL(info->ce->name),
+		zend_get_unmangled_property_name(info->name),
+		ZSTR_VAL(type_str));
+	zend_string_release(type_str);
+}
+
 ZEND_COLD void zend_match_unhandled_error(zval *value)
 {
 	smart_str msg = {0};
@@ -1001,6 +1018,8 @@ static zend_always_inline bool zend_value_instanceof_static(zval *zv) {
 # define HAVE_CACHE_SLOT 1
 #endif
 
+#define PROGRESS_CACHE_SLOT() if (HAVE_CACHE_SLOT) {cache_slot++;}
+
 static zend_always_inline zend_class_entry *zend_fetch_ce_from_cache_slot(
 		void **cache_slot, zend_type *type)
 {
@@ -1033,19 +1052,28 @@ static zend_always_inline zend_class_entry *zend_fetch_ce_from_cache_slot(
 }
 
 static bool zend_check_intersection_type_from_cache_slot(zend_type_list *intersection_type_list,
-	zend_class_entry *arg_ce, void **cache_slot)
+	zend_class_entry *arg_ce, void ***cache_slot_ptr)
 {
+	void **cache_slot = *cache_slot_ptr;
 	zend_class_entry *ce;
 	zend_type *list_type;
+	bool status = true;
 	ZEND_TYPE_LIST_FOREACH(intersection_type_list, list_type) {
-		ce = zend_fetch_ce_from_cache_slot(cache_slot, list_type);
-		/* If type is not an instance of one of the types taking part in the
-		 * intersection it cannot be a valid instance of the whole intersection type. */
-		if (!ce || !instanceof_function(arg_ce, ce)) {
-			return false;
+		/* Only check classes if the type might be valid */
+		if (status) {
+			ce = zend_fetch_ce_from_cache_slot(cache_slot, list_type);
+			/* If type is not an instance of one of the types taking part in the
+			 * intersection it cannot be a valid instance of the whole intersection type. */
+			if (!ce || !instanceof_function(arg_ce, ce)) {
+				status = false;
+			}
 		}
+		PROGRESS_CACHE_SLOT();
 	} ZEND_TYPE_LIST_FOREACH_END();
-	return true;
+	if (HAVE_CACHE_SLOT) {
+		*cache_slot_ptr = cache_slot;
+	}
+	return status;
 }
 
 static zend_always_inline bool zend_check_type_slow(
@@ -1058,24 +1086,14 @@ static zend_always_inline bool zend_check_type_slow(
 		if (UNEXPECTED(ZEND_TYPE_HAS_LIST(*type))) {
 			zend_type *list_type;
 			if (ZEND_TYPE_IS_INTERSECTION(*type)) {
-				ZEND_TYPE_LIST_FOREACH(ZEND_TYPE_LIST(*type), list_type) {
-					ce = zend_fetch_ce_from_cache_slot(cache_slot, list_type);
-					/* If type is not an instance of one of the types taking part in the
-					 * intersection it cannot be a valid instance of the whole intersection type. */
-					if (!ce || !instanceof_function(Z_OBJCE_P(arg), ce)) {
-						return false;
-					}
-					if (HAVE_CACHE_SLOT) {
-						cache_slot++;
-					}
-				} ZEND_TYPE_LIST_FOREACH_END();
-				return true;
+				return zend_check_intersection_type_from_cache_slot(ZEND_TYPE_LIST(*type), Z_OBJCE_P(arg), &cache_slot);
 			} else {
 				ZEND_TYPE_LIST_FOREACH(ZEND_TYPE_LIST(*type), list_type) {
 					if (ZEND_TYPE_IS_INTERSECTION(*list_type)) {
-						if (zend_check_intersection_type_from_cache_slot(ZEND_TYPE_LIST(*list_type), Z_OBJCE_P(arg), cache_slot)) {
+						if (zend_check_intersection_type_from_cache_slot(ZEND_TYPE_LIST(*list_type), Z_OBJCE_P(arg), &cache_slot)) {
 							return true;
 						}
+						/* The cache_slot is progressed in zend_check_intersection_type_from_cache_slot() */
 					} else {
 						ZEND_ASSERT(!ZEND_TYPE_HAS_LIST(*list_type));
 						ce = zend_fetch_ce_from_cache_slot(cache_slot, list_type);
@@ -1083,10 +1101,7 @@ static zend_always_inline bool zend_check_type_slow(
 						if (ce && instanceof_function(Z_OBJCE_P(arg), ce)) {
 							return true;
 						}
-					}
-
-					if (HAVE_CACHE_SLOT) {
-						cache_slot++;
+						PROGRESS_CACHE_SLOT();
 					}
 				} ZEND_TYPE_LIST_FOREACH_END();
 			}
@@ -3560,7 +3575,7 @@ ZEND_API zval* zend_assign_to_typed_ref(zval *variable_ptr, zval *orig_value, ze
 	return variable_ptr;
 }
 
-ZEND_API bool ZEND_FASTCALL zend_verify_prop_assignable_by_ref(zend_property_info *prop_info, zval *orig_val, bool strict) {
+ZEND_API bool ZEND_FASTCALL zend_verify_prop_assignable_by_ref_ex(zend_property_info *prop_info, zval *orig_val, bool strict, zend_verify_prop_assignable_by_ref_context context) {
 	zval *val = orig_val;
 	if (Z_ISREF_P(val) && ZEND_REF_HAS_TYPE_SOURCES(Z_REF_P(val))) {
 		int result;
@@ -3591,8 +3606,18 @@ ZEND_API bool ZEND_FASTCALL zend_verify_prop_assignable_by_ref(zend_property_inf
 		}
 	}
 
-	zend_verify_property_type_error(prop_info, val);
+	if (EXPECTED(context == ZEND_VERIFY_PROP_ASSIGNABLE_BY_REF_CONTEXT_ASSIGNMENT)) {
+		zend_verify_property_type_error(prop_info, val);
+	} else {
+		ZEND_ASSERT(context == ZEND_VERIFY_PROP_ASSIGNABLE_BY_REF_CONTEXT_MAGIC_GET);
+		zend_magic_get_property_type_inconsistency_error(prop_info, val);
+	}
+
 	return 0;
+}
+
+ZEND_API bool ZEND_FASTCALL zend_verify_prop_assignable_by_ref(zend_property_info *prop_info, zval *orig_val, bool strict) {
+	return zend_verify_prop_assignable_by_ref_ex(prop_info, orig_val, strict, ZEND_VERIFY_PROP_ASSIGNABLE_BY_REF_CONTEXT_ASSIGNMENT);
 }
 
 ZEND_API void ZEND_FASTCALL zend_ref_add_type_source(zend_property_info_source_list *source_list, zend_property_info *prop)

@@ -1722,6 +1722,7 @@ static void date_register_classes(void) /* {{{ */
 
 	date_ce_date = register_class_DateTime(date_ce_interface);
 	date_ce_date->create_object = date_object_new_date;
+	date_ce_date->default_object_handlers = &date_object_handlers_date;
 	memcpy(&date_object_handlers_date, &std_object_handlers, sizeof(zend_object_handlers));
 	date_object_handlers_date.offset = XtOffsetOf(php_date_obj, std);
 	date_object_handlers_date.free_obj = date_object_free_storage_date;
@@ -1732,6 +1733,7 @@ static void date_register_classes(void) /* {{{ */
 
 	date_ce_immutable = register_class_DateTimeImmutable(date_ce_interface);
 	date_ce_immutable->create_object = date_object_new_date;
+	date_ce_immutable->default_object_handlers = &date_object_handlers_date;
 	memcpy(&date_object_handlers_immutable, &std_object_handlers, sizeof(zend_object_handlers));
 	date_object_handlers_immutable.clone_obj = date_object_clone_date;
 	date_object_handlers_immutable.compare = date_object_compare_date;
@@ -1740,6 +1742,7 @@ static void date_register_classes(void) /* {{{ */
 
 	date_ce_timezone = register_class_DateTimeZone();
 	date_ce_timezone->create_object = date_object_new_timezone;
+	date_ce_timezone->default_object_handlers = &date_object_handlers_timezone;
 	memcpy(&date_object_handlers_timezone, &std_object_handlers, sizeof(zend_object_handlers));
 	date_object_handlers_timezone.offset = XtOffsetOf(php_timezone_obj, std);
 	date_object_handlers_timezone.free_obj = date_object_free_storage_timezone;
@@ -1751,6 +1754,7 @@ static void date_register_classes(void) /* {{{ */
 
 	date_ce_interval = register_class_DateInterval();
 	date_ce_interval->create_object = date_object_new_interval;
+	date_ce_interval->default_object_handlers = &date_object_handlers_interval;
 	memcpy(&date_object_handlers_interval, &std_object_handlers, sizeof(zend_object_handlers));
 	date_object_handlers_interval.offset = XtOffsetOf(php_interval_obj, std);
 	date_object_handlers_interval.free_obj = date_object_free_storage_interval;
@@ -1765,6 +1769,7 @@ static void date_register_classes(void) /* {{{ */
 
 	date_ce_period = register_class_DatePeriod(zend_ce_aggregate);
 	date_ce_period->create_object = date_object_new_period;
+	date_ce_period->default_object_handlers = &date_object_handlers_period;
 	date_ce_period->get_iterator = date_object_period_get_iterator;
 	memcpy(&date_object_handlers_period, &std_object_handlers, sizeof(zend_object_handlers));
 	date_object_handlers_period.offset = XtOffsetOf(php_period_obj, std);
@@ -1782,7 +1787,6 @@ static zend_object *date_object_new_date(zend_class_entry *class_type) /* {{{ */
 
 	zend_object_std_init(&intern->std, class_type);
 	object_properties_init(&intern->std, class_type);
-	intern->std.handlers = &date_object_handlers_date;
 
 	return &intern->std;
 } /* }}} */
@@ -1923,7 +1927,6 @@ static zend_object *date_object_new_timezone(zend_class_entry *class_type) /* {{
 
 	zend_object_std_init(&intern->std, class_type);
 	object_properties_init(&intern->std, class_type);
-	intern->std.handlers = &date_object_handlers_timezone;
 
 	return &intern->std;
 } /* }}} */
@@ -2076,7 +2079,6 @@ static zend_object *date_object_new_interval(zend_class_entry *class_type) /* {{
 
 	zend_object_std_init(&intern->std, class_type);
 	object_properties_init(&intern->std, class_type);
-	intern->std.handlers = &date_object_handlers_interval;
 
 	return &intern->std;
 } /* }}} */
@@ -2168,8 +2170,6 @@ static zend_object *date_object_new_period(zend_class_entry *class_type) /* {{{ 
 
 	zend_object_std_init(&intern->std, class_type);
 	object_properties_init(&intern->std, class_type);
-
-	intern->std.handlers = &date_object_handlers_period;
 
 	return &intern->std;
 } /* }}} */
@@ -2263,13 +2263,24 @@ PHPAPI zval *php_date_instantiate(zend_class_entry *pce, zval *object) /* {{{ */
 
 /* Helper function used to store the latest found warnings and errors while
  * parsing, from either strtotime or parse_from_format. */
-static void update_errors_warnings(timelib_error_container *last_errors) /* {{{ */
+static void update_errors_warnings(timelib_error_container **last_errors) /* {{{ */
 {
 	if (DATEG(last_errors)) {
 		timelib_error_container_dtor(DATEG(last_errors));
 		DATEG(last_errors) = NULL;
 	}
-	DATEG(last_errors) = last_errors;
+
+	if (last_errors == NULL || (*last_errors) == NULL) {
+		return;
+	}
+
+	if ((*last_errors)->warning_count || (*last_errors)->error_count) {
+		DATEG(last_errors) = *last_errors;
+		return;
+	}
+
+	timelib_error_container_dtor(*last_errors);
+	*last_errors = NULL;
 } /* }}} */
 
 static void php_date_set_time_fraction(timelib_time *time, int microseconds)
@@ -2320,7 +2331,7 @@ PHPAPI bool php_date_initialize(php_date_obj *dateobj, const char *time_str, siz
 	}
 
 	/* update last errors and warnings */
-	update_errors_warnings(err);
+	update_errors_warnings(&err);
 
 	/* If called from a constructor throw an exception */
 	if ((flags & PHP_DATE_INIT_CTOR) && err && err->error_count) {
@@ -2998,7 +3009,8 @@ static bool php_date_modify(zval *object, char *modify, size_t modify_len) /* {{
 	tmp_time = timelib_strtotime(modify, modify_len, &err, DATE_TIMEZONEDB, php_date_parse_tzfile_wrapper);
 
 	/* update last errors and warnings */
-	update_errors_warnings(err);
+	update_errors_warnings(&err);
+
 	if (err && err->error_count) {
 		/* spit out the first library error message, at least */
 		php_error_docref(NULL, E_WARNING, "Failed to parse time string (%s) at position %d (%c): %s", modify,
@@ -3774,7 +3786,7 @@ PHP_FUNCTION(timezone_name_get)
 PHP_FUNCTION(timezone_name_from_abbr)
 {
 	zend_string  *abbr;
-	char         *tzid;
+	const char   *tzid;
 	zend_long     gmtoffset = -1;
 	zend_long     isdst = -1;
 

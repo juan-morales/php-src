@@ -95,10 +95,10 @@ if (typeof(CWD) == "undefined") {
 if (!MODE_PHPIZE) {
 	/* defaults; we pick up the precise versions from configure.ac */
 	var PHP_VERSION = 8;
-	var PHP_MINOR_VERSION = 2;
+	var PHP_MINOR_VERSION = 3;
 	var PHP_RELEASE_VERSION = 0;
 	var PHP_EXTRA_VERSION = "";
-	var PHP_VERSION_STRING = "8.2.0";
+	var PHP_VERSION_STRING = "8.3.0";
 }
 
 /* Get version numbers and DEFINE as a string */
@@ -2087,9 +2087,7 @@ function generate_files()
 	}
 
 	STDOUT.WriteLine("Generating files...");
-	if (!MODE_PHPIZE) {
-		generate_tmp_php_ini();
-	}
+	generate_tmp_php_ini();
 	generate_makefile();
 	if (!MODE_PHPIZE) {
 		generate_internal_functions();
@@ -2532,11 +2530,9 @@ function generate_makefile()
 		handle_analyzer_makefile_flags(MF, keys[i], val);
 	}
 
-	if (!MODE_PHPIZE) {
-		var val = "yes" == PHP_TEST_INI ? PHP_TEST_INI_PATH : "";
-		/* Be sure it's done after generate_tmp_php_ini(). */
-		MF.WriteLine("PHP_TEST_INI_PATH=\"" + val + "\"");
-	}
+	var val = "yes" == PHP_TEST_INI ? PHP_TEST_INI_PATH : "";
+	/* Be sure it's done after generate_tmp_php_ini(). */
+	MF.WriteLine("PHP_TEST_INI_PATH=\"" + val + "\"");
 
 	MF.WriteBlankLines(1);
 	if (MODE_PHPIZE) {

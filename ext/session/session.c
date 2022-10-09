@@ -142,6 +142,11 @@ static inline void php_rshutdown_session_globals(void) /* {{{ */
 		PS(session_vars) = NULL;
 	}
 
+	if (PS(mod_user_class_name)) {
+		zend_string_release(PS(mod_user_class_name));
+		PS(mod_user_class_name) = NULL;
+	}
+
 	/* User save handlers may end up directly here by misuse, bugs in user script, etc. */
 	/* Set session status to prevent error while restoring save handler INI value. */
 	PS(session_status) = php_session_none;
@@ -609,22 +614,6 @@ static PHP_INI_MH(OnUpdateSerializer) /* {{{ */
 }
 /* }}} */
 
-static PHP_INI_MH(OnUpdateTransSid) /* {{{ */
-{
-	SESSION_CHECK_ACTIVE_STATE;
-	SESSION_CHECK_OUTPUT_STATE;
-
-	if (zend_string_equals_literal_ci(new_value, "on")) {
-		PS(use_trans_sid) = (bool) 1;
-	} else {
-		PS(use_trans_sid) = (bool) atoi(ZSTR_VAL(new_value));
-	}
-
-	return SUCCESS;
-}
-/* }}} */
-
-
 static PHP_INI_MH(OnUpdateSaveDir) /* {{{ */
 {
 	SESSION_CHECK_ACTIVE_STATE;
@@ -719,8 +708,8 @@ static PHP_INI_MH(OnUpdateSessionString) /* {{{ */
 
 static PHP_INI_MH(OnUpdateSessionBool) /* {{{ */
 {
-	SESSION_CHECK_OUTPUT_STATE;
 	SESSION_CHECK_ACTIVE_STATE;
+	SESSION_CHECK_OUTPUT_STATE;
 	return OnUpdateBool(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
 }
 /* }}} */
@@ -731,8 +720,8 @@ static PHP_INI_MH(OnUpdateSidLength) /* {{{ */
 	zend_long val;
 	char *endptr = NULL;
 
-	SESSION_CHECK_OUTPUT_STATE;
 	SESSION_CHECK_ACTIVE_STATE;
+	SESSION_CHECK_OUTPUT_STATE;
 	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
 	if (endptr && (*endptr == '\0')
 		&& val >= 22 && val <= PS_MAX_SID_LENGTH) {
@@ -751,8 +740,8 @@ static PHP_INI_MH(OnUpdateSidBits) /* {{{ */
 	zend_long val;
 	char *endptr = NULL;
 
-	SESSION_CHECK_OUTPUT_STATE;
 	SESSION_CHECK_ACTIVE_STATE;
+	SESSION_CHECK_OUTPUT_STATE;
 	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
 	if (endptr && (*endptr == '\0')
 		&& val >= 4 && val <=6) {
@@ -765,17 +754,6 @@ static PHP_INI_MH(OnUpdateSidBits) /* {{{ */
 	return FAILURE;
 }
 /* }}} */
-
-
-static PHP_INI_MH(OnUpdateLazyWrite) /* {{{ */
-{
-	SESSION_CHECK_ACTIVE_STATE;
-	SESSION_CHECK_OUTPUT_STATE;
-	return OnUpdateBool(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
-}
-/* }}} */
-
-
 
 static PHP_INI_MH(OnUpdateRfc1867Freq) /* {{{ */
 {
@@ -809,19 +787,19 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("session.cookie_lifetime",    "0",         PHP_INI_ALL, OnUpdateCookieLifetime,cookie_lifetime,    php_ps_globals,    ps_globals)
 	STD_PHP_INI_ENTRY("session.cookie_path",        "/",         PHP_INI_ALL, OnUpdateSessionString, cookie_path,        php_ps_globals,    ps_globals)
 	STD_PHP_INI_ENTRY("session.cookie_domain",      "",          PHP_INI_ALL, OnUpdateSessionString, cookie_domain,      php_ps_globals,    ps_globals)
-	STD_PHP_INI_ENTRY("session.cookie_secure",      "0",         PHP_INI_ALL, OnUpdateSessionBool,   cookie_secure,      php_ps_globals,    ps_globals)
-	STD_PHP_INI_ENTRY("session.cookie_httponly",    "0",         PHP_INI_ALL, OnUpdateSessionBool,   cookie_httponly,    php_ps_globals,    ps_globals)
-	STD_PHP_INI_ENTRY("session.cookie_samesite",    "",          PHP_INI_ALL, OnUpdateString,        cookie_samesite,    php_ps_globals,    ps_globals)
-	STD_PHP_INI_ENTRY("session.use_cookies",        "1",         PHP_INI_ALL, OnUpdateSessionBool,   use_cookies,        php_ps_globals,    ps_globals)
-	STD_PHP_INI_ENTRY("session.use_only_cookies",   "1",         PHP_INI_ALL, OnUpdateSessionBool,   use_only_cookies,   php_ps_globals,    ps_globals)
-	STD_PHP_INI_ENTRY("session.use_strict_mode",    "0",         PHP_INI_ALL, OnUpdateSessionBool,   use_strict_mode,    php_ps_globals,    ps_globals)
+	STD_PHP_INI_BOOLEAN("session.cookie_secure",    "0",         PHP_INI_ALL, OnUpdateSessionBool,   cookie_secure,      php_ps_globals,    ps_globals)
+	STD_PHP_INI_BOOLEAN("session.cookie_httponly",  "0",         PHP_INI_ALL, OnUpdateSessionBool,   cookie_httponly,    php_ps_globals,    ps_globals)
+	STD_PHP_INI_ENTRY("session.cookie_samesite",    "",          PHP_INI_ALL, OnUpdateSessionString, cookie_samesite,    php_ps_globals,    ps_globals)
+	STD_PHP_INI_BOOLEAN("session.use_cookies",      "1",         PHP_INI_ALL, OnUpdateSessionBool,   use_cookies,        php_ps_globals,    ps_globals)
+	STD_PHP_INI_BOOLEAN("session.use_only_cookies", "1",         PHP_INI_ALL, OnUpdateSessionBool,   use_only_cookies,   php_ps_globals,    ps_globals)
+	STD_PHP_INI_BOOLEAN("session.use_strict_mode",  "0",         PHP_INI_ALL, OnUpdateSessionBool,   use_strict_mode,    php_ps_globals,    ps_globals)
 	STD_PHP_INI_ENTRY("session.referer_check",      "",          PHP_INI_ALL, OnUpdateSessionString, extern_referer_chk, php_ps_globals,    ps_globals)
 	STD_PHP_INI_ENTRY("session.cache_limiter",      "nocache",   PHP_INI_ALL, OnUpdateSessionString, cache_limiter,      php_ps_globals,    ps_globals)
 	STD_PHP_INI_ENTRY("session.cache_expire",       "180",       PHP_INI_ALL, OnUpdateSessionLong,   cache_expire,       php_ps_globals,    ps_globals)
-	PHP_INI_ENTRY("session.use_trans_sid",          "0",         PHP_INI_ALL, OnUpdateTransSid)
+	STD_PHP_INI_BOOLEAN("session.use_trans_sid",    "0",         PHP_INI_ALL, OnUpdateSessionBool,   use_trans_sid,      php_ps_globals,    ps_globals)
 	PHP_INI_ENTRY("session.sid_length",             "32",        PHP_INI_ALL, OnUpdateSidLength)
 	PHP_INI_ENTRY("session.sid_bits_per_character", "4",         PHP_INI_ALL, OnUpdateSidBits)
-	STD_PHP_INI_BOOLEAN("session.lazy_write",       "1",         PHP_INI_ALL, OnUpdateLazyWrite,     lazy_write,         php_ps_globals,    ps_globals)
+	STD_PHP_INI_BOOLEAN("session.lazy_write",       "1",         PHP_INI_ALL, OnUpdateSessionBool,    lazy_write,         php_ps_globals,    ps_globals)
 
 	/* Upload progress */
 	STD_PHP_INI_BOOLEAN("session.upload_progress.enabled",
@@ -1090,6 +1068,8 @@ PHPAPI zend_result php_session_register_module(const ps_module *ptr) /* {{{ */
 /* }}} */
 
 /* Dummy PS module function */
+/* We consider any ID valid (thus also implying that a session with such an ID exists),
+	thus we always return SUCCESS */
 PHPAPI zend_result php_session_validate_sid(PS_VALIDATE_SID_ARGS) {
 	return SUCCESS;
 }
@@ -2275,18 +2255,24 @@ PHP_FUNCTION(session_regenerate_id)
 		}
 		RETURN_THROWS();
 	}
-	if (PS(use_strict_mode) && PS(mod)->s_validate_sid &&
-		PS(mod)->s_validate_sid(&PS(mod_data), PS(id)) == SUCCESS) {
-		zend_string_release_ex(PS(id), 0);
-		PS(id) = PS(mod)->s_create_sid(&PS(mod_data));
-		if (!PS(id)) {
-			PS(mod)->s_close(&PS(mod_data));
-			PS(session_status) = php_session_none;
-			if (!EG(exception)) {
-				zend_throw_error(NULL, "Failed to create session ID by collision: %s (path: %s)", PS(mod)->s_name, PS(save_path));
+	if (PS(use_strict_mode)) {
+		if ((!PS(mod_user_implemented) && PS(mod)->s_validate_sid) || !Z_ISUNDEF(PS(mod_user_names).name.ps_validate_sid)) {
+			int limit = 3;
+			/* Try to generate non-existing ID */
+			while (limit-- && PS(mod)->s_validate_sid(&PS(mod_data), PS(id)) == SUCCESS) {
+				zend_string_release_ex(PS(id), 0);
+				PS(id) = PS(mod)->s_create_sid(&PS(mod_data));
+				if (!PS(id)) {
+					PS(mod)->s_close(&PS(mod_data));
+					PS(session_status) = php_session_none;
+					if (!EG(exception)) {
+						zend_throw_error(NULL, "Failed to create session ID by collision: %s (path: %s)", PS(mod)->s_name, PS(save_path));
+					}
+					RETURN_THROWS();
+				}
 			}
-			RETURN_THROWS();
 		}
+		// TODO warn that ID cannot be verified? else { }
 	}
 	/* Read is required to make new session data at this point. */
 	if (PS(mod)->s_read(&PS(mod_data), PS(id), &data, PS(gc_maxlifetime)) == FAILURE) {
@@ -2313,7 +2299,6 @@ PHP_FUNCTION(session_regenerate_id)
 /* }}} */
 
 /* {{{ Generate new session ID. Intended for user save handlers. */
-/* This is not used yet */
 PHP_FUNCTION(session_create_id)
 {
 	zend_string *prefix = NULL, *new_id;
@@ -2337,7 +2322,7 @@ PHP_FUNCTION(session_create_id)
 		int limit = 3;
 		while (limit--) {
 			new_id = PS(mod)->s_create_sid(&PS(mod_data));
-			if (!PS(mod)->s_validate_sid) {
+			if (!PS(mod)->s_validate_sid || (PS(mod_user_implemented) && Z_ISUNDEF(PS(mod_user_names).name.ps_validate_sid))) {
 				break;
 			} else {
 				/* Detect collision and retry */

@@ -183,7 +183,7 @@ static void sapi_read_post_data(void)
 	 * - Make the content type lowercase
 	 * - Trim descriptive data, stay with the content-type only
 	 */
-	for (p=content_type; p<content_type+content_type_length; p++) {
+	for (p = content_type; p < content_type + content_type_length; p++) {
 		switch (*p) {
 			case ';':
 			case ',':
@@ -207,10 +207,11 @@ static void sapi_read_post_data(void)
 	} else {
 		/* fallback */
 		SG(request_info).post_entry = NULL;
-		if (!sapi_module.default_post_reader) {
-			/* no default reader? */
+		if (UNEXPECTED(!sapi_module.default_post_reader)) {
+			/* this should not happen as there should always be a default_post_reader */
 			SG(request_info).content_type_dup = NULL;
 			sapi_module.sapi_error(E_WARNING, "Unsupported content type:  '%s'", content_type);
+			efree(content_type);
 			return;
 		}
 	}
@@ -218,6 +219,7 @@ static void sapi_read_post_data(void)
 		*(p-1) = oldchar;
 	}
 
+	/* the content_type_dup is not set at this stage so no need to try to free it first */
 	SG(request_info).content_type_dup = content_type;
 
 	if(post_reader_func) {
@@ -489,7 +491,7 @@ static void sapi_send_headers_free(void)
 	}
 }
 
-SAPI_API void sapi_deactivate(void)
+SAPI_API void sapi_deactivate_module(void)
 {
 	zend_llist_destroy(&SG(sapi_headers).headers);
 	if (SG(request_info).request_body) {
@@ -523,6 +525,10 @@ SAPI_API void sapi_deactivate(void)
 	if (sapi_module.deactivate) {
 		sapi_module.deactivate();
 	}
+}
+
+SAPI_API void sapi_deactivate_destroy(void)
+{
 	if (SG(rfc1867_uploaded_files)) {
 		destroy_uploaded_files_hash();
 	}
@@ -535,6 +541,12 @@ SAPI_API void sapi_deactivate(void)
 	SG(headers_sent) = 0;
 	SG(request_info).headers_read = 0;
 	SG(global_request_time) = 0;
+}
+
+SAPI_API void sapi_deactivate(void)
+{
+	sapi_deactivate_module();
+	sapi_deactivate_destroy();
 }
 
 

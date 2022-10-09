@@ -64,7 +64,7 @@
 
 #include "random_arginfo.h"
 
-ZEND_DECLARE_MODULE_GLOBALS(random)
+PHPAPI ZEND_DECLARE_MODULE_GLOBALS(random)
 
 PHPAPI zend_class_entry *random_ce_Random_Engine;
 PHPAPI zend_class_entry *random_ce_Random_CryptoSafeEngine;
@@ -90,14 +90,14 @@ static zend_object_handlers random_randomizer_object_handlers;
 
 static inline uint32_t rand_range32(const php_random_algo *algo, php_random_status *status, uint32_t umax)
 {
-	uint32_t result, limit, r;
+	uint32_t result, limit;
 	size_t total_size = 0;
 	uint32_t count = 0;
 
 	result = 0;
 	total_size = 0;
 	do {
-		r = algo->generate(status);
+		uint32_t r = algo->generate(status);
 		result = result | (r << (total_size * 8));
 		total_size += status->last_generated_size;
 		if (EG(exception)) {
@@ -107,7 +107,7 @@ static inline uint32_t rand_range32(const php_random_algo *algo, php_random_stat
 
 	/* Special case where no modulus is required */
 	if (UNEXPECTED(umax == UINT32_MAX)) {
-		return true;
+		return result;
 	}
 
 	/* Increment the max so range is inclusive of max */
@@ -132,7 +132,7 @@ static inline uint32_t rand_range32(const php_random_algo *algo, php_random_stat
 		result = 0;
 		total_size = 0;
 		do {
-			r = algo->generate(status);
+			uint32_t r = algo->generate(status);
 			result = result | (r << (total_size * 8));
 			total_size += status->last_generated_size;
 			if (EG(exception)) {
@@ -146,14 +146,14 @@ static inline uint32_t rand_range32(const php_random_algo *algo, php_random_stat
 
 static inline uint64_t rand_range64(const php_random_algo *algo, php_random_status *status, uint64_t umax)
 {
-	uint64_t result, limit, r;
+	uint64_t result, limit;
 	size_t total_size = 0;
 	uint32_t count = 0;
 
 	result = 0;
 	total_size = 0;
 	do {
-		r = algo->generate(status);
+		uint64_t r = algo->generate(status);
 		result = result | (r << (total_size * 8));
 		total_size += status->last_generated_size;
 		if (EG(exception)) {
@@ -188,7 +188,7 @@ static inline uint64_t rand_range64(const php_random_algo *algo, php_random_stat
 		result = 0;
 		total_size = 0;
 		do {
-			r = algo->generate(status);
+			uint64_t r = algo->generate(status);
 			result = result | (r << (total_size * 8));
 			total_size += status->last_generated_size;
 			if (EG(exception)) {
@@ -226,8 +226,6 @@ static zend_object *php_random_randomizer_new(zend_class_entry *ce)
 
 	zend_object_std_init(&randomizer->std, ce);
 	object_properties_init(&randomizer->std, ce);
-
-	randomizer->std.handlers = &random_randomizer_object_handlers;
 
 	return &randomizer->std;
 }
@@ -313,7 +311,7 @@ PHPAPI zend_long php_random_range(const php_random_algo *algo, php_random_status
 {
 	zend_ulong umax = (zend_ulong) max - (zend_ulong) min;
 
-	if (algo->generate_size == 0 || algo->generate_size > sizeof(uint32_t) || umax > UINT32_MAX) {
+	if (umax > UINT32_MAX) {
 		return (zend_long) (rand_range64(algo, status, umax) + min);
 	}
 
@@ -880,6 +878,7 @@ PHP_MINIT_FUNCTION(random)
 	/* Random\Randomizer */
 	random_ce_Random_Randomizer = register_class_Random_Randomizer();
 	random_ce_Random_Randomizer->create_object = php_random_randomizer_new;
+	random_ce_Random_Randomizer->default_object_handlers = &random_randomizer_object_handlers;
 	memcpy(&random_randomizer_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 	random_randomizer_object_handlers.offset = XtOffsetOf(php_random_randomizer, std);
 	random_randomizer_object_handlers.free_obj = randomizer_free_obj;
